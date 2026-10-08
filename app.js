@@ -30,6 +30,7 @@ let registered = false, bundlesGenerated = false, registration = 'idle';
 let activeOperation = -1, aliceDerived = false, groupCreated = false;
 let inspection = null;
 let aliceSessionEphemeral = 'absent';
+let bobPrekeysClaimed = false, bobPrekeysDeleted = false;
 const CANCELLED = Symbol('cancelled');
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function reset() {
@@ -39,6 +40,7 @@ function reset() {
   bobOnline = true; conversation = []; deliveryQueue = [];
   chatOpen = established = busy = false;
   registered = bundlesGenerated = false; registration = 'idle'; aliceSessionEphemeral = 'absent';
+  bobPrekeysClaimed = bobPrekeysDeleted = false;
   activeOperation = -1; aliceDerived = groupCreated = false; inspection = null;
   $('message').value = ''; $('messages').replaceChildren();
   $('payload').textContent = 'Mensagem'; $('event').textContent = 'Nenhum evento publicado.';
@@ -74,6 +76,7 @@ async function stage(value, run) {
   if (run !== epoch) throw CANCELLED;
   step = value;
   for (let n = 0; n < OPERATIONS[value].length; n++) {
+    if (value === 1 && n === 1) bobPrekeysClaimed = true;
     if (value === 2 && OPERATIONS[value][n].title === 'Gerar efêmeras de sessão') aliceSessionEphemeral = 'available';
     activeOperation = n; render();
     scrollToCurrentOperation(n === 0);
@@ -81,6 +84,7 @@ async function stage(value, run) {
   }
   if (value === 2) { aliceDerived = true; aliceSessionEphemeral = 'discarded'; }
   if (value === 3) groupCreated = true;
+  if (value === 5) bobPrekeysDeleted = true;
 }
 function render() {
   $('counter').textContent = step < 0 ? registered ? 'Aguardando uma mensagem' : busy ? 'Registro em execução' : 'Aguardando registro de Alice' : `Passo ${step + 1} · ${step} de 8${busy ? ' · em execução' : ''}`;
@@ -100,7 +104,7 @@ function renderTimeline() {
   const focusedData = focused && focused.dataset;
   const focusSelector = focusedData && focusedData.inspectRegistration ? `[data-inspect-registration="${focusedData.inspectRegistration}"]` : focusedData && focusedData.inspectStep !== undefined ? `[data-inspect-step="${focusedData.inspectStep}"]${focusedData.inspectOperation !== undefined ? `[data-inspect-operation="${focusedData.inspectOperation}"]` : ':not([data-inspect-operation])'}` : null;
   const registrationFlow = `<div class="registration-flow"><span class="eyebrow">REGISTRO · PREPARAÇÃO DIDÁTICA</span><div class="flow-step ${registration === 'generating' ? 'current' : !bundlesGenerated ? 'future' : ''}"><button type="button" class="step-heading" data-inspect-registration="generating"><strong>Alice gera e assina os bundles Γ e Σ</strong></button><div class="routes"><span class="local" style="grid-column:1">IK + EK + PQE + Sig</span></div></div><div class="flow-step ${registration === 'publishing' ? 'current' : !registered ? 'future' : ''}"><button type="button" class="step-heading" data-inspect-registration="publishing"><strong>Publicar Γ.bundle e Σ.bundle no HS_A</strong></button><div class="routes"><span class="route" style="grid-column:1/3;--route-columns:2">publish(Γ.bundle, Σ.bundle)</span></div></div><p class="muted">Preparação anterior ao fluxo da Figura 1 do artigo msgX. Todas as chaves privadas ficam no celular.</p></div>`;
-  $('timeline').innerHTML = registrationFlow + '<p class="muted">Os bundles públicos Γ e Σ de Bob já estão disponíveis no HS_B. A numeração da Figura 1 do artigo é preservada a partir do passo ②.</p>' + FLOW.map((s,i) => {
+  $('timeline').innerHTML = registrationFlow + `<p class="muted">${bobPrekeysClaimed ? 'As pré-chaves EK e PQE de Bob foram consumidas pelo claim; a identidade pública permanece no HS_B.' : 'Os bundles públicos Γ e Σ de Bob já estão disponíveis no HS_B.'} A numeração da Figura 1 do artigo é preservada a partir do passo ②.</p>` + FLOW.map((s,i) => {
     if (i === 0) return '';
     const routes = s.routes.map(r => `<div class="routes"><span class="route ${r.from > r.to ? 'reverse' : ''}" style="grid-column:${Math.min(r.from,r.to)+1}/${Math.max(r.from,r.to)+2};--route-columns:${Math.abs(r.from-r.to)+1}">${esc(r.label)}</span></div>`).join('');
     const local = !s.routes.length ? `<div class="routes"><span class="local" style="grid-column:${i === 5 || i === 8 ? 4 : 1}">Computação local</span></div>` : '';
@@ -158,7 +162,7 @@ function renderExplanation() {
 function renderKeys() {
   const owner = $('owner').value;
   if (owner === 'Servidores') {
-    $('keys').innerHTML = `<p class="muted">HS_B: Γ.bundle_B + Σ.bundle_B públicos de Bob previamente publicados.<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A_bundle^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A_bundle^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${step >= 4 ? 'PreKeyMessage: Γ.ct, Σ.ct, EK públicas de sessão (distintas do bundle de Alice), setup*\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
+    $('keys').innerHTML = `<p class="muted">HS_B: ${bobPrekeysClaimed ? 'EK_B e PQE_B de Γ/Σ consumidas pelo claim; indisponíveis para novos acordos. IK_B pública e assinaturas permanecem; a resposta já entregue pode constar do histórico.' : 'Γ.bundle_B + Σ.bundle_B disponíveis; EK_B e PQE_B de uso único neste modelo.'}<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A_bundle^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A_bundle^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${step >= 4 ? 'PreKeyMessage: Γ.ct, Σ.ct, EK públicas de sessão (distintas do bundle de Alice), setup*\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
     return;
   }
   const initialized = owner === 'Alice' ? aliceDerived : established;
@@ -172,11 +176,11 @@ function renderKeys() {
   $('keys').innerHTML = ['Γ', 'Σ'].map((b, k) => {
     const rows = [
       ['IK', generated ? `${b}.IK_${owner === 'Alice' ? 'A' : 'B'} (privada local)` : '—'],
-      ['EK publicada (bundle)', generated ? `${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''} (privada local; pública no bundle)` : '—'],
+      ['EK publicada (bundle)', owner === 'Bob' ? `${b}.EK_B (${bobPrekeysDeleted ? 'privada apagada após o acordo' : 'privada local'}; ${bobPrekeysClaimed ? 'pública consumida no HS_B' : 'pública disponível no HS_B'})` : generated ? `${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''} (privada local; pública no bundle)` : '—'],
       ...(owner === 'Alice' ? [['EK de sessão', aliceSessionEphemeral === 'absent' ? '— (gerada no passo ③)' : aliceSessionEphemeral === 'available' ? `${b}.EK_A (nova; privada temporária local)` : `${b}.EK_A (privada descartada após o acordo; pública mantida para a PreKeyMessage)`]] : []),
-      ['PQE', generated ? `${b}.PQE_${suffix} (privada local)` : '—'],
+      ['PQE', owner === 'Bob' ? `${b}.PQE_B (${bobPrekeysDeleted ? 'privada apagada após o acordo' : 'privada local'}; ${bobPrekeysClaimed ? 'pública consumida no HS_B' : 'pública disponível no HS_B'}; uso único neste modelo)` : generated ? `${b}.PQE_${suffix} (privada local)` : '—'],
       ['Sig', generated ? `${b}.Sig_${suffix} (assinada com ${b}.IK_${suffix}^priv)` : '—'],
-      ['bundle', generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
+      ['bundle', owner === 'Bob' && bobPrekeysClaimed ? 'EK/PQE consumidas; identidade preservada. Tupla original apenas no histórico do acordo.' : generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
       ['PQ', initialized ? ({none: 'Sem operação PQ de renovação nesta etapa de raiz', prepare: 'Etapa de preparação PQ; exige envio de PQT pública', reinject: 'Etapa de reinjeção PQ; exige intercâmbio KEM completo'})[pqAction(controlRoot, Number($('exponent').value))] : '—'],
       ['msgX R', initialized ? `${b}.R_${controlRoot}` : '—'],
       ['msgX C', initialized ? `${b}.C_${controlRoot},${controlChain}` : '—'],

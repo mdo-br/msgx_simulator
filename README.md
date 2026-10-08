@@ -151,3 +151,12 @@ No passo ③, gera uma nova `EK_A` por ramo para iniciar o acordo com Bob,
 antes dos ECDH. A privada dessa efêmera de sessão é descartada após a
 derivação; a pública é mantida para compor a PreKeyMessage. O inspetor
 separa esses ciclos de vida. Todos esses identificadores são simbólicos.
+
+No modelo, EK_B e PQE_B de ambos os ramos são pré-chaves de uso único:
+o HS_B as retira do estoque durante o claim (passo ②), mantendo IK_B.
+Bob conserva as privadas até concluir o acordo e autenticar o setup (passo ⑥),
+quando elas são marcadas como apagadas. A identidade e os estados derivados
+permanecem. O artigo descreve as efêmeras, mas não detalha a política de
+estoque, reposição ou fallback PQ; tratar PQE como uso único é uma escolha
+explícita desta demonstração. Não há reposição simulada. O descarte é simbólico
+e ilustra uma condição para FS, sem garantir segurança do estado atual.
