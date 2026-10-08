@@ -65,7 +65,7 @@ Os links da interface não dependem de arquivos fora dessa pasta.
 - Inspetor simbólico separado por participante e por ramo Γ / Σ.
 - Mensagens de Alice, envelope em duas camadas e contagem de eventos.
 - Renovação automática a cada R mensagens e timeout manual.
-- G membros e período PQ de 2ᵖ renovações. Os parâmetros reiniciam o estado.
+- G membros; R e G reiniciam o estado. O parâmetro PQ p fica desativado neste cenário sem nova T de Bob.
 
 As fórmulas e direções foram extraídas dos arquivos `.drawio` do projeto de
 origem. Para regenerar os dados em um clone independente, use:
@@ -107,13 +107,19 @@ HKDF, HMAC, AES ou o transporte Matrix. Os estados msgX (controle) e msgGX
 (grupo) são identificados separadamente. Não atribua garantias de segurança
 a esta demonstração.
 
-A renovação representa uma fronteira idealizada com novo material do par
-disponível. Não simula a alternância de papéis, a ida e volta de material KEM,
-o caso de avanço apenas da cadeia, mensagens fora de ordem,
+Somente Alice envia. Sem nova chave de ratchet T de Bob, cada renovação
+msgGX avança apenas as cadeias msgX, conforme a §3.4 e a Figura 4:
+Γ.C_i,j = HMAC(Γ.C_i,j−1, 0x2) e Σ.C_i,j = HMAC(Σ.C_i,j−1, 0x4).
+As message keys são derivadas com 0x1/0x3 (Figura 5). As raízes permanecem
+em R₀ e i = 0; j avança independentemente da sessão e do índice de mensagens
+msgGX. Bob só atualiza seu estado ao receber cada setup, inclusive após
+reconectar. Não há novo ECDH, preparação ou reinjeção PQ nas renovações;
+o acordo inicial permanece híbrido. Esse avanço simétrico não demonstra
+recuperação após comprometimento da cadeia. O parâmetro p está desativado.
+
+Não são simulados avanços de raiz com nova T, alternância de papéis,
+encapsulamento/retorno KEM nas renovações, mensagens fora de ordem,
 falha de assinatura, autenticação de dispositivos ou entrada/saída de membros.
-A preparação PQ é sinalizada em i = 2ᵖ·n − 1 e a reinjeção em i = 2ᵖ·n.
-O artigo exige avanço somente de cadeia quando o mesmo participante renova
-sem nova chave do par; esse comportamento ainda precisa de um cenário próprio.
 
 O tamanho da sala controla a contagem de G−1 canais; apenas Alice/Bob são
 exibidos. Um evento é publicado pelo remetente, mas há distribuição federada.
@@ -122,8 +128,8 @@ a conversa e cancela operações pendentes. Alterar parâmetros também reinicia
 O histórico didático não representa o armazenamento seguro de chaves reais.
 Os celulares mostram apenas Alice como remetente e Bob como destinatário,
 conforme os diagramas. O cenário offline começa após o setup inicial e não
-representa persistência real, retransmissão ou tratamento de perdas. Mesmo
-offline, a renovação preserva a hipótese idealizada de material do par disponível.
+representa persistência real, retransmissão ou tratamento de perdas. Offline, os setups aguardam na fila e Bob reproduz os avanços de cadeia
+somente ao recebê-los, em ordem.
 
 ## Inspiração
 

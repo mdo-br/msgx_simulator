@@ -8,12 +8,14 @@ const DETAILS = [
   ['Transportar a PreKeyMessage', 'A mensagem leva os dois ciphertexts KEM, as chaves públicas efêmeras de Alice e o setup protegido pelos homeservers.', 'Os servidores transportam o envelope; não recebem o setup em claro.'],
   ['Bob reconstrói a sessão', 'Bob decapsula nos dois ramos, reconstrói as derivações e remove a camada Σ antes da camada Γ. Inicializa então o msgGX.', 'Os identificadores de chave coincidem entre os participantes; suas chaves privadas permanecem distintas.'],
   ['Um evento para a sala', 'Os dois ratchets simétricos do msgGX avançam com um índice compartilhado. Alice publica um único evento com dupla camada.', 'O envio de Alice é independente de G; os homeservers ainda precisam distribuir o evento.'],
-  ['Renovar e distribuir', 'Ao atingir R mensagens ou timeout, o plano de controle msgX protege um novo setup e o distribui por G−1 canais individuais.', 'Fronteira idealizada: assumimos novo material do par disponível. ECDH entra em cada avanço de raiz; o segredo PQ entra apenas nas fronteiras 2ᵖ.'],
+  ['Renovar e distribuir', 'Ao atingir R mensagens ou timeout, o plano de controle msgX protege um novo setup e o distribui por G−1 canais individuais.', 'Bob não envia nova T neste cenário: somente as cadeias msgX avançam. As raízes permanecem em R₀; não há novo ECDH nem reinjeção PQ na renovação.'],
   ['Bob adota o novo setup', 'Bob avança o estado correspondente, remove as duas camadas do setup e reinicializa o msgGX. A troca de mensagens pode continuar.', 'A distribuição é O(G). O custo por evento publicado por Alice permanece independente do tamanho da sala.']
 ];
 const $ = id => document.getElementById(id);
 let step = -1, session = 0, index = 0, published = 0, setups = 0;
 let bobOnline = true, bobSession = 0, bobIndex = 0;
+// msgX (i,j) is independent of the msgGX session/message counters.
+let rootIndex = 0, chainIndex = 0, bobRootIndex = 0, bobChainIndex = 0;
 let conversation = [], deliveryQueue = [];
 let chatOpen = false, established = false, busy = false, epoch = 0, cancelDelay = null;
 let registered = false, bundlesGenerated = false, registration = 'idle';
@@ -24,6 +26,7 @@ const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&
 function reset() {
   epoch++; if (cancelDelay) cancelDelay();
   step = -1; session = index = published = setups = bobSession = bobIndex = 0;
+  rootIndex = chainIndex = bobRootIndex = bobChainIndex = 0;
   bobOnline = true; conversation = []; deliveryQueue = [];
   chatOpen = established = busy = false;
   registered = bundlesGenerated = false; registration = 'idle';
@@ -100,6 +103,10 @@ function renderTimeline() {
   }
   $('timeline').scrollTop = previousScroll;
 }
+function protocolFormula(value) {
+  // Figure 1 summarizes root advancement; this scenario follows §3.4, Figure 4.
+  return value >= 7 ? OPERATIONS[value].map(o => o.formula).join("\n\n") : FLOW[value].formula;
+}
 function renderExplanation() {
   const viewStep = inspection ? inspection.step : step;
   const viewOperation = inspection ? inspection.operation : activeOperation;
@@ -110,7 +117,7 @@ function renderExplanation() {
   $('phase-name').textContent = viewStep < 0 ? 'O PROTOCOLO ACOMPANHA A CONVERSA' : `FASE ${phase} · ${PHASES[phase-1].toUpperCase()}`;
   $('step-title').textContent = viewStep < 0 ? 'Envie a primeira mensagem' : DETAILS[viewStep][0];
   $('description').textContent = viewStep < 0 ? 'Clique em Bob no celular de Alice, digite uma mensagem e envie. A inicialização e o acordo de chaves acontecem automaticamente; cada operação aparece aqui.' : DETAILS[viewStep][1];
-  $('formula').textContent = viewStep < 0 ? 'msgX → controle e distribuição de setups\nmsgGX → eventos de grupo' : FLOW[viewStep].formula;
+  $('formula').textContent = viewStep < 0 ? 'msgX → controle e distribuição de setups\nmsgGX → eventos de grupo' : protocolFormula(viewStep);
   $('insight').textContent = viewStep < 0 ? 'Nenhuma operação do protocolo exige uma ação adicional no aplicativo.' : DETAILS[viewStep][2];
   if (viewStep < 0 && (!registered || inspection)) {
     $('phase-name').textContent = 'ANTES DA CONVERSA · REGISTRO DE ALICE';
@@ -135,7 +142,7 @@ function renderExplanation() {
     const reference = document.createElement('span');
     reference.textContent = ' — ' + operation.source.replace(/^Artigo msgX · /, '');
     $('operation-source').replaceChildren(articleLink, reference);
-    $('source-formula').textContent = FLOW[viewStep].formula;
+    $('source-formula').textContent = protocolFormula(viewStep);
   }
 }
 function renderKeys() {
@@ -145,7 +152,9 @@ function renderKeys() {
     return;
   }
   const initialized = owner === 'Alice' ? aliceDerived : established;
-  const rootSession = owner === 'Bob' ? bobSession : session;
+  const groupSession = owner === 'Bob' ? bobSession : session;
+  const controlRoot = owner === 'Bob' ? bobRootIndex : rootIndex;
+  const controlChain = owner === 'Bob' ? bobChainIndex : chainIndex;
   const groupIndex = owner === 'Bob' ? bobIndex : index;
   const groupReady = owner === 'Alice' ? groupCreated : established;
   const generated = owner === 'Bob' ? true : bundlesGenerated;
@@ -157,11 +166,11 @@ function renderKeys() {
       ['PQE', generated ? `${b}.PQE_${suffix} (privada local)` : '—'],
       ['Sig', generated ? `${b}.Sig_${suffix} (assinada com ${b}.IK_${suffix}^priv)` : '—'],
       ['bundle', generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
-      ['msgX R', initialized ? `${b}.R_${rootSession}` : '—'],
-      ['msgX C', initialized ? `${b}.C_${rootSession},0` : '—'],
-      ['msgX M', initialized ? `${b}.M_${rootSession},0 · HMAC(C, ${k ? '0x3' : '0x1'})` : '—'],
-      ['msgGX', groupReady ? `${b}.sessão_${rootSession} · índice ${groupIndex}` : '—'],
-      ['GX M', groupReady && groupIndex ? `${b}.msgGX.M_${rootSession},${groupIndex} (usada; descartada no modelo)` : '—']
+      ['msgX R', initialized ? `${b}.R_${controlRoot}` : '—'],
+      ['msgX C', initialized ? `${b}.C_${controlRoot},${controlChain}` : '—'],
+      ['msgX M', initialized ? `${b}.M_${controlRoot},${controlChain} · HMAC(C, ${k ? '0x3' : '0x1'})` : '—'],
+      ['msgGX', groupReady ? `${b}.sessão_${groupSession} · índice ${groupIndex}` : '—'],
+      ['GX M', groupReady && groupIndex ? `${b}.msgGX.M_${groupSession},${groupIndex} (usada; descartada no modelo)` : '—']
     ];
     return `<div class="branch ${k ? 'sigma' : 'gamma'}"><strong>${b} · ${k ? 'Soberano' : 'Padrão'}</strong><dl>${rows.map(([a,v]) => `<dt>${a}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
   }).join('');
@@ -169,6 +178,7 @@ function renderKeys() {
 
 function receive(event) {
   bobSession = event.session; bobIndex = event.index;
+  if (event.type === 'setup') { bobRootIndex = event.rootIndex; bobChainIndex = event.chainIndex; }
   if (event.type === 'message') event.record.delivered = true;
 }
 function deliver(event) { if (bobOnline) receive(event); else deliveryQueue.push(event); }
@@ -216,11 +226,11 @@ function log(text, meta) {
 async function renew(reason, run) {
   await stage(7, run);
   session++; index = 0; setups += Number($('members').value)-1;
-  const period = 2 ** Number($('exponent').value);
-  log(`${reason} → sessão ${session} · ${Number($('members').value)-1} canais msgX · ${session % period === 0 ? 'ECDH + novo segredo PQ' : 'ECDH; sem reinjeção PQ'}${session % period === period-1 ? ' · preparação PQ para a próxima fronteira' : ''}.`, null);
+  chainIndex++;
+  log(`${reason} → sessão msgGX ${session} · ${Number($('members').value)-1} canais msgX · somente cadeia: i=${rootIndex}, j=${chainIndex} · raízes mantidas · sem novo ECDH ou reinjeção PQ.`, null);
   render();
   if (bobOnline) await stage(8, run);
-  deliver({type:'setup', session, index:0});
+  deliver({type:'setup', session, index:0, rootIndex, chainIndex});
   if (!bobOnline) log('Setup protegido aguarda no HS_B até Bob reconectar.', null);
   render();
 }
