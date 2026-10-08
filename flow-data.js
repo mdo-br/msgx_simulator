@@ -51,7 +51,7 @@ const FLOW = [
     "sourceIds": [
       "b3"
     ],
-    "formula": "③ verify(Γ.Sig) ∧ verify(Σ.Sig)  →  abort\n   Γ.S ← Γ.DH₁‖Γ.DH₂‖Γ.DH₃‖Γ.ss      (3× ECDH + KEM.Enc)\n   Σ.S ← Σ.DH₁‖Σ.DH₂‖Σ.DH₃‖Σ.ss      (3× ECDH + KEM.Enc)\n   Γ.R₀‖Γ.C₀,₀ ← HKDF(0, Γ.S, \"OLM_ROOT\", 64)\n   Σ.R₀‖Σ.C₀,₀ ← HKDF(0, Σ.S, \"GC_ROOT\", 64)",
+    "formula": "③ ¬verify(Γ.Sig) ∨ ¬verify(Σ.Sig)  →  abort\n   Γ.S ← Γ.DH₁‖Γ.DH₂‖Γ.DH₃‖Γ.ss      (3× ECDH + KEM.Enc)\n   Σ.S ← Σ.DH₁‖Σ.DH₂‖Σ.DH₃‖Σ.ss      (3× ECDH + KEM.Enc)\n   Γ.R₀‖Γ.C₀,₀ ← HKDF(0, Γ.S, \"OLM_ROOT\", 64)\n   Σ.R₀‖Σ.C₀,₀ ← HKDF(0, Σ.S, \"GC_ROOT\", 64)",
     "routes": []
   },
   {
@@ -69,7 +69,7 @@ const FLOW = [
       "a7",
       "a8"
     ],
-    "formula": "⑤ send(PreKeyMessage)\n⟨Γ.ct, Σ.ct, Γ.EK^pub_A, Σ.EK^pub_A, setup₀*⟩\n\n⑤ forward()\n\n⑤ deliver(PreKeyMessage)",
+    "formula": "⑤ send(PreKeyMessage)\n⟨Γ.IK^pub_A, Σ.IK^pub_A, Γ.EK^pub_A, Σ.EK^pub_A,\n Γ.ct, Σ.ct, ids(Γ/Σ.EK_B, Γ/Σ.PQE_B), setup₀*⟩\n\n⑤ forward()\n\n⑤ deliver(PreKeyMessage)",
     "routes": [
       {
         "from": 0,
@@ -104,7 +104,7 @@ const FLOW = [
       "a10",
       "a11"
     ],
-    "formula": "⑦ Γ.ratchet.advance() → Γ.M\n   Σ.ratchet.advance() → Σ.M\n        (dois ratchets, índice compartilhado)\n   evt ← AEAD(Σ.M, AEAD(Γ.M, msg))\n   1 evento para toda a sala, independe de N\n\n⑦ publish(evt)\n\n⑦ forward()\n\n⑦ deliver(evt)\nmsg ← AEAD⁻¹(Γ.M, AEAD⁻¹(Σ.M, evt))",
+    "formula": "⑦ Γ.ratchet.advance() → Γ.M\n   Σ.ratchet.advance() → Σ.M\n        (dois ratchets, índice compartilhado)\n   evt ← AEAD(Σ.M, AEAD(Γ.M, msg))\n   1 evento para toda a sala, independe de G\n\n⑦ publish(evt)\n\n⑦ forward()\n\n⑦ deliver(evt)\nmsg ← AEAD⁻¹(Γ.M, AEAD⁻¹(Σ.M, evt))",
     "routes": [
       {
         "from": 0,
@@ -131,7 +131,7 @@ const FLOW = [
       "a13",
       "a14"
     ],
-    "formula": "⑧ on(count = R ∨ timeout):\n   Γ.advanceRootKey(·) → Γ.R_i‖Γ.C_i,0\n   Σ.advanceRootKey(·) → Σ.R_i‖Σ.C_i,0\n        ss_i ≠ null ⟺ i = 2^N·n      (senão, só ECDH)\n   setup_i* ← AEAD(Σ.M_i,j, AEAD(Γ.M_i,j, setup_i))\n\n⑧ ∀ m ∈ sala, m ≠ A: send(setup_i*)\nN−1 canais msgX  →  O(N)\n\n⑧ forward()\n\n⑧ deliver(setup_i*)",
+    "formula": "⑧ on(count = R ∨ timeout):\n   Γ.advanceRootKey(·) → Γ.R_i‖Γ.C_i,0\n   Σ.advanceRootKey(·) → Σ.R_i‖Σ.C_i,0\n        ss_i ≠ null ⟺ i = 2^N·n      (senão, só ECDH)\n   setup_i* ← AEAD(Σ.M_i,j, AEAD(Γ.M_i,j, setup_i))\n\n⑧ ∀ m ∈ sala, m ≠ A: send(setup_i*)\nG−1 canais msgX  →  O(G)\n\n⑧ forward()\n\n⑧ deliver(setup_i*)",
     "routes": [
       {
         "from": 0,

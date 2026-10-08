@@ -99,8 +99,11 @@ desfaz o registro simbólico.
 
 A ordem das camadas segue os diagramas v4: Γ interna e Σ externa. Algumas
 fórmulas de `anatomia-dois-ramos-msgX.md` usam a ordem inversa. No passo ③,
-o rótulo original com “→ abort” é preservado; a explicação esclarece que
-o aborto ocorre quando uma verificação falha.
+o diagrama aborta se qualquer verificação falhar:
+`¬verify(Γ.Sig) ∨ ¬verify(Σ.Sig) → abort`. Nos diagramas, G é o tamanho da
+sala e N aparece apenas como expoente PQ (`2^N·n`), como na §3.4 do artigo.
+A PreKeyMessage explicita as identidades públicas de Alice, necessárias ao
+DH₁ de Bob, e os identificadores das pré-chaves de Bob.
 
 Todos os artefatos são simbólicos. O protótipo não implementa ECDH, KEM,
 HKDF, HMAC, AES ou o transporte Matrix. Os estados msgX (controle) e msgGX
