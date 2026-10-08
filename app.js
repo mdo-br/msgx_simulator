@@ -12,10 +12,18 @@ const DETAILS = [
   ['Bob adota o novo setup', 'Bob avança o estado correspondente, remove as duas camadas do setup e reinicializa o msgGX. A troca de mensagens pode continuar.', 'A distribuição é O(G). O custo por evento publicado por Alice permanece independente do tamanho da sala.']
 ];
 const $ = id => document.getElementById(id);
-let step = -1, session = 0, index = 0, published = 0, setups = 0;
-let bobOnline = true, bobSession = 0, bobIndex = 0;
-// msgX (i,j) is independent of the msgGX session/message counters.
-let rootIndex = 0, chainIndex = 0, bobRootIndex = 0, bobChainIndex = 0;
+let step = -1, published = 0, setups = 0;
+let bobOnline = true;
+const newParticipantState = () => ({msgX: {i: 0, j: 0}, msgGX: {session: 0, index: 0}});
+let alice = newParticipantState(), bob = newParticipantState();
+// Evaluated on a root-advancement step, never on a msgGX session number.
+function pqAction(i, p) {
+  if (i <= 0) return 'none';
+  const period = 2 ** p;
+  if (i % period === period - 1) return 'prepare';
+  if (i % period === 0) return 'reinject';
+  return 'none';
+}
 let conversation = [], deliveryQueue = [];
 let chatOpen = false, established = false, busy = false, epoch = 0, cancelDelay = null;
 let registered = false, bundlesGenerated = false, registration = 'idle';
@@ -25,8 +33,8 @@ const CANCELLED = Symbol('cancelled');
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function reset() {
   epoch++; if (cancelDelay) cancelDelay();
-  step = -1; session = index = published = setups = bobSession = bobIndex = 0;
-  rootIndex = chainIndex = bobRootIndex = bobChainIndex = 0;
+  step = -1; published = setups = 0;
+  alice = newParticipantState(); bob = newParticipantState();
   bobOnline = true; conversation = []; deliveryQueue = [];
   chatOpen = established = busy = false;
   registered = bundlesGenerated = false; registration = 'idle';
@@ -81,7 +89,7 @@ function render() {
   $('message').disabled = !chatOpen;
   $('send').disabled = !chatOpen || busy;
   $('renew').disabled = !established || busy;
-  $('chat-status').textContent = `Sessão ${session} · ${index}/${$('interval').value} mensagens · ${published} eventos publicados · ${setups} setups distribuídos`;
+  $('chat-status').textContent = `Sessão ${alice.msgGX.session} · ${alice.msgGX.index}/${$('interval').value} mensagens · ${published} eventos publicados · ${setups} setups distribuídos`;
   renderKeys(); renderPhones();
 }
 function renderTimeline() {
@@ -152,10 +160,10 @@ function renderKeys() {
     return;
   }
   const initialized = owner === 'Alice' ? aliceDerived : established;
-  const groupSession = owner === 'Bob' ? bobSession : session;
-  const controlRoot = owner === 'Bob' ? bobRootIndex : rootIndex;
-  const controlChain = owner === 'Bob' ? bobChainIndex : chainIndex;
-  const groupIndex = owner === 'Bob' ? bobIndex : index;
+  const groupSession = owner === 'Bob' ? bob.msgGX.session : alice.msgGX.session;
+  const controlRoot = owner === 'Bob' ? bob.msgX.i : alice.msgX.i;
+  const controlChain = owner === 'Bob' ? bob.msgX.j : alice.msgX.j;
+  const groupIndex = owner === 'Bob' ? bob.msgGX.index : alice.msgGX.index;
   const groupReady = owner === 'Alice' ? groupCreated : established;
   const generated = owner === 'Bob' ? true : bundlesGenerated;
   const suffix = owner === 'Alice' ? 'A' : 'B';
@@ -166,6 +174,7 @@ function renderKeys() {
       ['PQE', generated ? `${b}.PQE_${suffix} (privada local)` : '—'],
       ['Sig', generated ? `${b}.Sig_${suffix} (assinada com ${b}.IK_${suffix}^priv)` : '—'],
       ['bundle', generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
+      ['PQ', initialized ? ({none: 'Sem operação PQ de renovação nesta etapa de raiz', prepare: 'Etapa de preparação PQ; exige envio de PQT pública', reinject: 'Etapa de reinjeção PQ; exige intercâmbio KEM completo'})[pqAction(controlRoot, Number($('exponent').value))] : '—'],
       ['msgX R', initialized ? `${b}.R_${controlRoot}` : '—'],
       ['msgX C', initialized ? `${b}.C_${controlRoot},${controlChain}` : '—'],
       ['msgX M', initialized ? `${b}.M_${controlRoot},${controlChain} · HMAC(C, ${k ? '0x3' : '0x1'})` : '—'],
@@ -177,8 +186,8 @@ function renderKeys() {
 }
 
 function receive(event) {
-  bobSession = event.session; bobIndex = event.index;
-  if (event.type === 'setup') { bobRootIndex = event.rootIndex; bobChainIndex = event.chainIndex; }
+  bob.msgGX = {...event.msgGX};
+  if (event.type === 'setup') bob.msgX = {...event.msgX};
   if (event.type === 'message') event.record.delivered = true;
 }
 function deliver(event) { if (bobOnline) receive(event); else deliveryQueue.push(event); }
@@ -225,12 +234,12 @@ function log(text, meta) {
 }
 async function renew(reason, run) {
   await stage(7, run);
-  session++; index = 0; setups += Number($('members').value)-1;
-  chainIndex++;
-  log(`${reason} → sessão msgGX ${session} · ${Number($('members').value)-1} canais msgX · somente cadeia: i=${rootIndex}, j=${chainIndex} · raízes mantidas · sem novo ECDH ou reinjeção PQ.`, null);
+  alice.msgGX.session++; alice.msgGX.index = 0; setups += Number($('members').value)-1;
+  alice.msgX.j++;
+  log(`${reason} → sessão msgGX ${alice.msgGX.session} · ${Number($('members').value)-1} canais msgX · somente cadeia: i=${alice.msgX.i}, j=${alice.msgX.j} · raízes mantidas · sem novo ECDH ou reinjeção PQ.`, null);
   render();
   if (bobOnline) await stage(8, run);
-  deliver({type:'setup', session, index:0, rootIndex, chainIndex});
+  deliver({type:'setup', msgGX: {...alice.msgGX}, msgX: {...alice.msgX}});
   if (!bobOnline) log('Setup protegido aguarda no HS_B até Bob reconectar.', null);
   render();
 }
@@ -251,7 +260,7 @@ $('send-form').onsubmit = async e => {
   e.preventDefault(); const text = $('message').value.trim();
   if (!text || !registered || !chatOpen || busy) return;
   busy = true; const run = epoch;
-  const record = {text, session, index:0, delivered:false, transported:false};
+  const record = {text, session: alice.msgGX.session, index:0, delivered:false, transported:false};
   conversation.push(record); $('message').value = ''; render();
   try {
     if (!established) {
@@ -259,13 +268,13 @@ $('send-form').onsubmit = async e => {
       established = true;
     }
     await stage(6,run);
-    index++; published++; record.session = session; record.index = index; record.transported = true;
+    alice.msgGX.index++; published++; record.session = alice.msgGX.session; record.index = alice.msgGX.index; record.transported = true;
     $('payload').textContent = text;
-    $('event').textContent = `evt_${session},${index} = AEAD(Σ.msgGX.M_${session},${index},\n  AEAD(Γ.msgGX.M_${session},${index}, msg))\n\nPublicações de Alice: 1 · destinatários: ${Number($('members').value)-1}`;
-    deliver({type:'message',session,index,record});
-    log(text, `Sessão ${session} · índice ${index} · ${bobOnline ? 'Bob decifra: Σ → Γ' : 'aguardando no HS_B'}`);
+    $('event').textContent = `evt_${alice.msgGX.session},${alice.msgGX.index} = AEAD(Σ.msgGX.M_${alice.msgGX.session},${alice.msgGX.index},\n  AEAD(Γ.msgGX.M_${alice.msgGX.session},${alice.msgGX.index}, msg))\n\nPublicações de Alice: 1 · destinatários: ${Number($('members').value)-1}`;
+    deliver({type:'message',msgGX: {...alice.msgGX},record});
+    log(text, `Sessão ${alice.msgGX.session} · índice ${alice.msgGX.index} · ${bobOnline ? 'Bob decifra: Σ → Γ' : 'aguardando no HS_B'}`);
     render();
-    if (index >= Number($('interval').value)) await renew('R atingido',run);
+    if (alice.msgGX.index >= Number($('interval').value)) await renew('R atingido',run);
   } catch(error) { if (error !== CANCELLED) throw error; }
   finally { if (run === epoch) { busy = false; render(); } }
 };

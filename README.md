@@ -139,3 +139,9 @@ e adaptadas aos protocolos msgX e msgGX.
 
 As citações usam a URL da SBC Open Library. A cópia local do PDF permanece
 no projeto de origem como base do detalhamento.
+
+O estado de cada participante separa `msgX: {i, j}` de
+`msgGX: {session, index}`. A regra PQ usa somente `i`: preparação quando
+`i > 0` e `i mod 2ᵖ = 2ᵖ − 1`; reinjeção quando `i > 0` e
+`i mod 2ᵖ = 0`. Essas condições identificam etapas de avanço de raiz e
+não substituem o intercâmbio de material necessário. `i = 0` não é reinjeção.
