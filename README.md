@@ -97,13 +97,43 @@ IK pública, EK pública, PQE pública e assinatura; as chaves privadas ficam
 no cliente. O primeiro envio estabelece a sessão com Bob. Reiniciar também
 desfaz o registro simbólico.
 
-A ordem das camadas segue os diagramas v4: Γ interna e Σ externa. Algumas
-fórmulas de `anatomia-dois-ramos-msgX.md` usam a ordem inversa. No passo ③,
+A ordem das camadas, esclarecida pelo autor do projeto, é Γ (padrão) interna
+e Σ (governo) externa. O projeto prevê
+comunicação não soberana usando apenas Γ; esse modo não é simulado aqui. No passo ③,
 o diagrama aborta se qualquer verificação falhar:
 `¬verify(Γ.Sig) ∨ ¬verify(Σ.Sig) → abort`. Nos diagramas, G é o tamanho da
 sala e N aparece apenas como expoente PQ (`2^N·n`), como na §3.4 do artigo.
 A PreKeyMessage explicita as identidades públicas de Alice, necessárias ao
 DH₁ de Bob, e os identificadores das pré-chaves de Bob.
+
+### Notação e escolhas complementares ao artigo
+
+A interface explica o fluxo das operações. As ressalvas sobre o nível de
+detalhe da referência e as escolhas da demonstração ficam documentadas aqui:
+
+- **Setup msgGX:** o artigo descreve seu papel na inicialização da sessão,
+  mas não define a serialização de seus campos. `setup_s` representa esse
+  material de forma simbólica, sem estabelecer um formato de implementação.
+- **Bundles e assinaturas:** `Sig` abrevia as assinaturas das pré-chaves do
+  ramo. A tupla exibida destaca os componentes do bundle e não especifica
+  sua codificação ou serialização.
+- **PreKeyMessage e envelopes de renovação:** as tuplas mostram os campos
+  relevantes para o acordo e o transporte. O artigo não especifica um
+  formato de wire completo. A inclusão explícita das identidades públicas
+  de Alice e dos identificadores das pré-chaves torna visíveis as entradas
+  necessárias ao processamento por Bob.
+- **Ordem das camadas:** Γ interna e Σ externa é a ordem esclarecida pelo
+  autor do projeto; o artigo não a explicita. O modo não soberano com apenas
+  Γ é previsto pelo projeto, mas não é implementado nesta demonstração.
+- **Pré-chaves PQ:** o artigo descreve PQE, mas não detalha sua política de
+  estoque, reposição ou fallback. Consumir PQE no claim e descartar sua
+  privada após o acordo são escolhas explícitas do modelo de uso único.
+- **Cifra soberana:** a Tabela 1 identifica AES-256-CBC para Γ e descreve Σ
+  pelo nível de segurança equivalente a 256 bits, sem identificar
+  publicamente o algoritmo governamental. O simulador mantém essa distinção.
+- **Ratchets de dados:** as constantes de HMAC das Figuras 4–5 pertencem ao
+  controle msgX. Elas não especificam toda a evolução Megolm do msgGX;
+  `msgGX.ratchet.advance()` é uma representação simbólica desse avanço.
 
 Todos os artefatos são simbólicos. O protótipo não implementa ECDH, KEM,
 HKDF, HMAC, AES ou o transporte Matrix. Os estados msgX (controle) e msgGX
@@ -159,9 +189,8 @@ No modelo, EK_B e PQE_B de ambos os ramos são pré-chaves de uso único:
 o HS_B as retira do estoque durante o claim (passo ②), mantendo IK_B.
 Bob conserva as privadas até concluir o acordo e autenticar o setup (passo ⑥),
 quando elas são marcadas como apagadas. A identidade e os estados derivados
-permanecem. O artigo descreve as efêmeras, mas não detalha a política de
-estoque, reposição ou fallback PQ; tratar PQE como uso único é uma escolha
-explícita desta demonstração. Não há reposição simulada. O descarte é simbólico
+permanecem. Tratar PQE como uso único é uma escolha explícita desta
+demonstração, que representa o consumo das pré-chaves no claim. Não há reposição simulada. O descarte é simbólico
 e ilustra uma condição para FS, sem garantir segurança do estado atual.
 
 O inspetor distingue o par local T, a T pública do par, PQT e ct de renovação
@@ -170,7 +199,7 @@ cenário atual, esses campos indicam ausência de material de ratchet simulado.
 A operação 8.5 mostra o envelope genérico com T e campos PQ opcionais de
 ambos os ramos, separado do envelope efetivo de avanço somente de cadeia.
 `setup_s` usa o número da sessão msgGX; `i` continua sendo a etapa de raiz.
-As tuplas são notação didática, não uma serialização de wire especificada.
+As tuplas destacam os campos relevantes para acompanhar cada operação.
 
 Com Bob offline, o envio anima somente as operações 7.1–7.3, até o transporte
 para o HS_B. Ao reconectar, cada evento pendente anima apenas a entrega e

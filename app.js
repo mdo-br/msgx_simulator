@@ -2,7 +2,7 @@
 const PHASES = ['Inicialização', 'Acordo de chaves', 'Troca de mensagens', 'Renovação de sessão'];
 const DETAILS = [
   ['Bob publica os bundles', 'Bob gera e publica os conjuntos públicos de Γ e Σ no HS_B. As chaves privadas permanecem no cliente.', 'Dois bundles independentes; o servidor armazena material público.'],
-  ['Alice consulta as pré-chaves', 'Alice solicita os bundles de Bob ao HS_A. A federação consulta o HS_B e devolve o material público.', 'O acordo pode começar sem uma resposta imediata de Bob.'],
+  ['Alice consulta as pré-chaves', 'Alice solicita os bundles públicos de Bob ao seu servidor, HS_A. O HS_A encaminha a consulta ao servidor de Bob, HS_B, que envia os bundles ao HS_A para entrega a Alice.', 'O acordo pode começar sem uma resposta imediata de Bob.'],
   ['Verificar e derivar', 'Alice verifica cada assinatura. Se qualquer verificação falhar, o acordo é abortado. Em cada ramo, três ECDH e um segredo KEM alimentam a HKDF.', 'OLM_ROOT e GC_ROOT separam os domínios de derivação. Basta uma assinatura inválida, em qualquer ramo, para abortar.'],
   ['Proteger o setup do msgGX', 'Alice cria o setup da sessão de grupo e o protege primeiro com Γ, depois com Σ.', 'São duas cifras sobre o mesmo setup, não duas mensagens independentes.'],
   ['Transportar a PreKeyMessage', 'A mensagem leva os dois ciphertexts KEM, as identidades e chaves públicas efêmeras de Alice, os identificadores das pré-chaves de Bob e o setup protegido pelos homeservers.', 'Os servidores transportam o envelope; não recebem o setup em claro.'],
