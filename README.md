@@ -145,3 +145,9 @@ O estado de cada participante separa `msgX: {i, j}` de
 `i > 0` e `i mod 2ᵖ = 2ᵖ − 1`; reinjeção quando `i > 0` e
 `i mod 2ᵖ = 0`. Essas condições identificam etapas de avanço de raiz e
 não substituem o intercâmbio de material necessário. `i = 0` não é reinjeção.
+
+Alice mantém `EK_A_bundle` como pré-chave publicada para receber sessões.
+No passo ③, gera uma nova `EK_A` por ramo para iniciar o acordo com Bob,
+antes dos ECDH. A privada dessa efêmera de sessão é descartada após a
+derivação; a pública é mantida para compor a PreKeyMessage. O inspetor
+separa esses ciclos de vida. Todos esses identificadores são simbólicos.

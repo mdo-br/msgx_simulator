@@ -29,6 +29,7 @@ let chatOpen = false, established = false, busy = false, epoch = 0, cancelDelay 
 let registered = false, bundlesGenerated = false, registration = 'idle';
 let activeOperation = -1, aliceDerived = false, groupCreated = false;
 let inspection = null;
+let aliceSessionEphemeral = 'absent';
 const CANCELLED = Symbol('cancelled');
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function reset() {
@@ -37,7 +38,7 @@ function reset() {
   alice = newParticipantState(); bob = newParticipantState();
   bobOnline = true; conversation = []; deliveryQueue = [];
   chatOpen = established = busy = false;
-  registered = bundlesGenerated = false; registration = 'idle';
+  registered = bundlesGenerated = false; registration = 'idle'; aliceSessionEphemeral = 'absent';
   activeOperation = -1; aliceDerived = groupCreated = false; inspection = null;
   $('message').value = ''; $('messages').replaceChildren();
   $('payload').textContent = 'Mensagem'; $('event').textContent = 'Nenhum evento publicado.';
@@ -73,11 +74,12 @@ async function stage(value, run) {
   if (run !== epoch) throw CANCELLED;
   step = value;
   for (let n = 0; n < OPERATIONS[value].length; n++) {
+    if (value === 2 && OPERATIONS[value][n].title === 'Gerar efêmeras de sessão') aliceSessionEphemeral = 'available';
     activeOperation = n; render();
     scrollToCurrentOperation(n === 0);
     await delay(run);
   }
-  if (value === 2) aliceDerived = true;
+  if (value === 2) { aliceDerived = true; aliceSessionEphemeral = 'discarded'; }
   if (value === 3) groupCreated = true;
 }
 function render() {
@@ -131,7 +133,7 @@ function renderExplanation() {
     $('phase-name').textContent = 'ANTES DA CONVERSA · REGISTRO DE ALICE';
     $('step-title').textContent = viewRegistration === 'generating' ? 'Gerar os bundles de Alice' : viewRegistration === 'publishing' ? 'Publicar os bundles públicos' : 'Welcome, Alice';
     $('description').textContent = 'Clique em Register no celular de Alice. A geração dos bundles e sua publicação são apresentados aqui automaticamente. Nenhum dado pessoal é solicitado.';
-    $('formula').textContent = 'Para cada ramo b ∈ {Γ, Σ}:\n  b.IK_A ← IdentityKeyPair()\n  b.EK_A ← ECKeyPair()\n  b.PQE_A ← KEMKeyPair()\n  b.Sig_A ← Sign(b.IK_A^priv, pré-chaves públicas do ramo)\n  b.bundle_A ← ⟨b.IK_A^pub, b.EK_A^pub, b.PQE_A^pub, b.Sig_A⟩\n\nAlice → HS_A: publish(Γ.bundle_A, Σ.bundle_A)';
+    $('formula').textContent = 'Para cada ramo b ∈ {Γ, Σ}:\n  b.IK_A ← IdentityKeyPair()\n  b.EK_A_bundle ← ECKeyPair()\n  b.PQE_A ← KEMKeyPair()\n  b.Sig_A ← Sign(b.IK_A^priv, pré-chaves públicas do ramo)\n  b.bundle_A ← ⟨b.IK_A^pub, b.EK_A_bundle^pub, b.PQE_A^pub, b.Sig_A⟩\n\nAlice → HS_A: publish(Γ.bundle_A, Σ.bundle_A)';
     $('insight').textContent = 'Esta preparação didática antecede o fluxo da Figura 1 do artigo msgX. Publicar bundles não estabelece ainda uma sessão com Bob.';
   }
   const operation = viewStep >= 0 && viewOperation >= 0 ? OPERATIONS[viewStep][viewOperation] : null;
@@ -156,7 +158,7 @@ function renderExplanation() {
 function renderKeys() {
   const owner = $('owner').value;
   if (owner === 'Servidores') {
-    $('keys').innerHTML = `<p class="muted">HS_B: Γ.bundle_B + Σ.bundle_B públicos de Bob previamente publicados.<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${step >= 4 ? 'PreKeyMessage: Γ.ct, Σ.ct, EK públicas, setup*\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
+    $('keys').innerHTML = `<p class="muted">HS_B: Γ.bundle_B + Σ.bundle_B públicos de Bob previamente publicados.<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A_bundle^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A_bundle^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${step >= 4 ? 'PreKeyMessage: Γ.ct, Σ.ct, EK públicas de sessão (distintas do bundle de Alice), setup*\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
     return;
   }
   const initialized = owner === 'Alice' ? aliceDerived : established;
@@ -170,10 +172,11 @@ function renderKeys() {
   $('keys').innerHTML = ['Γ', 'Σ'].map((b, k) => {
     const rows = [
       ['IK', generated ? `${b}.IK_${owner === 'Alice' ? 'A' : 'B'} (privada local)` : '—'],
-      ['EK', generated ? `${b}.EK_${owner === 'Alice' ? 'A' : 'B'} (privada local)` : '—'],
+      ['EK publicada (bundle)', generated ? `${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''} (privada local; pública no bundle)` : '—'],
+      ...(owner === 'Alice' ? [['EK de sessão', aliceSessionEphemeral === 'absent' ? '— (gerada no passo ③)' : aliceSessionEphemeral === 'available' ? `${b}.EK_A (nova; privada temporária local)` : `${b}.EK_A (privada descartada após o acordo; pública mantida para a PreKeyMessage)`]] : []),
       ['PQE', generated ? `${b}.PQE_${suffix} (privada local)` : '—'],
       ['Sig', generated ? `${b}.Sig_${suffix} (assinada com ${b}.IK_${suffix}^priv)` : '—'],
-      ['bundle', generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
+      ['bundle', generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
       ['PQ', initialized ? ({none: 'Sem operação PQ de renovação nesta etapa de raiz', prepare: 'Etapa de preparação PQ; exige envio de PQT pública', reinject: 'Etapa de reinjeção PQ; exige intercâmbio KEM completo'})[pqAction(controlRoot, Number($('exponent').value))] : '—'],
       ['msgX R', initialized ? `${b}.R_${controlRoot}` : '—'],
       ['msgX C', initialized ? `${b}.C_${controlRoot},${controlChain}` : '—'],
