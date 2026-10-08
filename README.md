@@ -160,3 +160,11 @@ permanecem. O artigo descreve as efêmeras, mas não detalha a política de
 estoque, reposição ou fallback PQ; tratar PQE como uso único é uma escolha
 explícita desta demonstração. Não há reposição simulada. O descarte é simbólico
 e ilustra uma condição para FS, sem garantir segurança do estado atual.
+
+O inspetor distingue o par local T, a T pública do par, PQT e ct de renovação
+(Figura 3) das EK/PQE/ct do acordo inicial. Como não há avanço de raiz no
+cenário atual, esses campos indicam ausência de material de ratchet simulado.
+A operação 8.5 mostra o envelope genérico com T e campos PQ opcionais de
+ambos os ramos, separado do envelope efetivo de avanço somente de cadeia.
+`setup_s` usa o número da sessão msgGX; `i` continua sendo a etapa de raiz.
+As tuplas são notação didática, não uma serialização de wire especificada.

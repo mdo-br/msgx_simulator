@@ -182,6 +182,9 @@ function renderKeys() {
       ['Sig', generated ? `${b}.Sig_${suffix} (assinada com ${b}.IK_${suffix}^priv)` : '—'],
       ['bundle', owner === 'Bob' && bobPrekeysClaimed ? 'EK/PQE consumidas; identidade preservada. Tupla original apenas no histórico do acordo.' : generated ? `⟨${b}.IK_${suffix}^pub, ${b}.EK_${suffix}${owner === 'Alice' ? '_bundle' : ''}^pub, ${b}.PQE_${suffix}^pub, ${b}.Sig_${suffix}⟩` : '—'],
       ['PQ', initialized ? ({none: 'Sem operação PQ de renovação nesta etapa de raiz', prepare: 'Etapa de preparação PQ; exige envio de PQT pública', reinject: 'Etapa de reinjeção PQ; exige intercâmbio KEM completo'})[pqAction(controlRoot, Number($('exponent').value))] : '—'],
+      ['msgX T', initialized ? 'Par local T: —; T pública do par: — (troca de ratchet assimétrico não encenada; não são as EK do acordo inicial)' : '—'],
+      ['PQT', initialized ? '— (nenhum par PQT gerado; i = 0 neste cenário)' : '—'],
+      ['msgX ct', initialized ? '— (nenhum ciphertext KEM de renovação; distinto dos ct do acordo inicial)' : '—'],
       ['msgX R', initialized ? `${b}.R_${controlRoot}` : '—'],
       ['msgX C', initialized ? `${b}.C_${controlRoot},${controlChain}` : '—'],
       ['msgX M', initialized ? `${b}.M_${controlRoot},${controlChain} · HMAC(C, ${k ? '0x3' : '0x1'})` : '—'],
@@ -243,6 +246,8 @@ async function renew(reason, run) {
   await stage(7, run);
   alice.msgGX.session++; alice.msgGX.index = 0; setups += Number($('members').value)-1;
   alice.msgX.j++;
+  $('payload').textContent = `Setup da sessão msgGX ${alice.msgGX.session}`;
+  $('event').textContent = `Envelope de renovação Alice → Bob\nsetup_${alice.msgGX.session}* = AEAD(Σ.M_${alice.msgX.i},${alice.msgX.j},\n  AEAD(Γ.M_${alice.msgX.i},${alice.msgX.j}, setup_${alice.msgGX.session}))\nsend(⟨setup_${alice.msgGX.session}*⟩)\n\nSomente cadeia: sem nova T pública, PQT pública ou ct KEM.\nNotação didática; metadados de transporte omitidos.`;
   log(`${reason} → sessão msgGX ${alice.msgGX.session} · ${Number($('members').value)-1} canais msgX · somente cadeia: i=${alice.msgX.i}, j=${alice.msgX.j} · raízes mantidas · sem novo ECDH ou reinjeção PQ.`, null);
   render();
   if (bobOnline) await stage(8, run);
