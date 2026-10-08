@@ -101,7 +101,12 @@ function render() {
   $('send').disabled = !chatOpen || busy;
   $('renew').disabled = !established || busy;
   $('chat-status').textContent = `Sessão ${alice.msgGX.session} · ${alice.msgGX.index}/${$('interval').value} mensagens · ${published} eventos publicados · ${setups} setups distribuídos`;
-  renderKeys(); renderPhones();
+  renderKeys(); renderPhones(); announce();
+}
+// Single live region: announces the running operation once, ignoring inspection and re-renders.
+function announce() {
+  const text = step >= 0 && activeOperation >= 0 ? `Passo ${'①②③④⑤⑥⑦⑧⑨'[step]}, operação ${step+1}.${activeOperation+1}: ${OPERATIONS[step][activeOperation].title}` : '';
+  if ($('sr-status').textContent !== text) $('sr-status').textContent = text;
 }
 function renderTimeline() {
   const previousScroll = $('timeline').scrollTop;
@@ -140,8 +145,8 @@ function renderExplanation() {
   $('insight').textContent = viewStep < 0 ? 'Nenhuma operação do protocolo exige uma ação adicional no aplicativo.' : DETAILS[viewStep][2];
   if (viewStep < 0 && (!registered || inspection)) {
     $('phase-name').textContent = 'ANTES DA CONVERSA · REGISTRO DE ALICE';
-    $('step-title').textContent = viewRegistration === 'generating' ? 'Gerar os bundles de Alice' : viewRegistration === 'publishing' ? 'Publicar os bundles públicos' : 'Welcome, Alice';
-    $('description').textContent = 'Clique em Register no celular de Alice. A geração dos bundles e sua publicação são apresentados aqui automaticamente. Nenhum dado pessoal é solicitado.';
+    $('step-title').textContent = viewRegistration === 'generating' ? 'Gerar os bundles de Alice' : viewRegistration === 'publishing' ? 'Publicar os bundles públicos' : 'Bem-vinda, Alice';
+    $('description').textContent = 'Clique em Registrar no celular de Alice. A geração dos bundles e sua publicação são apresentados aqui automaticamente. Nenhum dado pessoal é solicitado.';
     $('formula').textContent = 'Para cada ramo b ∈ {Γ, Σ}:\n  b.IK_A ← IdentityKeyPair()\n  b.EK_A_bundle ← ECKeyPair()\n  b.PQE_A ← KEMKeyPair()\n  b.Sig_A ← Sign(b.IK_A^priv, pré-chaves públicas do ramo)\n  b.bundle_A ← ⟨b.IK_A^pub, b.EK_A_bundle^pub, b.PQE_A^pub, b.Sig_A⟩\n\nAlice → HS_A: publish(Γ.bundle_A, Σ.bundle_A)';
     $('insight').textContent = 'Esta preparação didática antecede o fluxo da Figura 1 do artigo msgX. Publicar bundles não estabelece ainda uma sessão com Bob.';
   }
@@ -209,7 +214,7 @@ function deliver(event) { if (bobOnline) receive(event); else deliveryQueue.push
 function renderPhones() {
   $('welcome-alice').hidden = registered;
   $('register-alice').disabled = busy;
-  $('register-alice').textContent = busy && !registered ? 'Registrando…' : 'Register';
+  $('register-alice').textContent = busy && !registered ? 'Registrando…' : 'Registrar';
   $('bob-contact').hidden = !registered || chatOpen;
   $('alice-screen').hidden = !registered;
   $('alice-chat-heading').hidden = !chatOpen;

@@ -28,12 +28,12 @@ Os links da interface não dependem de arquivos fora dessa pasta.
 
 ## Recursos
 
-- A tela inicial de Alice mostra “Welcome, Alice” e “Register”. O registro
+- A tela inicial de Alice mostra “Bem-vinda, Alice” e “Registrar”. O registro
   fictício não pede dados: gera bundles independentes Γ e Σ, cada um com
   IK, EK, PQE e assinatura própria, e publica os bundles públicos no HS_A,
   com animação no diagrama e atualização do
   inspetor. Só então a lista de contatos fica disponível.
-- Depois do registro, clique em Bob, escreva a mensagem e clique em Send ou
+- Depois do registro, clique em Bob, escreva a mensagem e clique em Enviar ou
   pressione Enter. A mensagem aparece imediatamente como pendente.
 - Os bundles Γ e Σ de Bob já estão publicados no HS_B ao iniciar. Suas
   chaves locais aparecem no inspetor; não há animação de geração/upload de Bob.
@@ -53,7 +53,7 @@ Os links da interface não dependem de arquivos fora dessa pasta.
   dos participantes. “Acompanhar execução” retorna à operação em andamento.
   Os títulos e operações também são acessíveis pelo teclado (Tab/Enter).
 - Cada passo exibido é decomposto em operações automáticas: entradas,
-  participante/local de execução, fórmula, saída e referência ao `main.pdf`.
+  participante/local de execução, fórmula, saída e referência ao artigo publicado.
   `operations.js` contém o detalhamento; `flow-data.js` preserva os diagramas.
   O intervalo controla a duração de cada operação individual: 3 segundos
   por padrão, com opções de 5 s, 1,5 s e 0,75 s. A rolagem mantém o passo
@@ -82,10 +82,10 @@ Os diagramas originais são necessários somente para regenerar os dados.
 
 Referência citada na interface: [artigo msgX · SBSeg 2026](https://sol.sbc.org.br/index.php/sbseg/article/view/44327).
 As citações das operações incluem link para a página do artigo na SBC Open Library e seção/figura do artigo.
-A leitura usou o `main.pdf` e os arquivos `.drawio` do projeto de origem.
-Esses arquivos não integram este repositório e não são necessários para
+A leitura usou a versão publicada do artigo (SBSeg 2026) e os arquivos
+`.drawio` do projeto de origem. Esses arquivos não integram este repositório e não são necessários para
 executar ou publicar o simulador.
-O detalhamento usa diretamente a seção 3 do PDF (pp. 5–9), suas Figuras 2–5,
+O detalhamento usa diretamente a seção 3 do artigo (pp. 5–9), suas Figuras 2–5,
 e ressalvas da seção 4. O detalhamento está em `operations.js`, com as
 referências ao artigo mostradas durante a simulação.
 
@@ -140,8 +140,8 @@ A interface e a proposta de visualização interativa foram inspiradas no
 [Signal Protocol Interactive Demo, hospedado na Bilkent University](https://cs.bilkent.edu.tr/~talayhan/teaching/signal.html),
 e adaptadas aos protocolos msgX e msgGX.
 
-As citações usam a URL da SBC Open Library. A cópia local do PDF permanece
-no projeto de origem como base do detalhamento.
+As citações usam a URL da SBC Open Library. As páginas citadas são as da
+versão publicada nos anais do SBSeg 2026.
 
 O estado de cada participante separa `msgX: {i, j}` de
 `msgGX: {session, index}`. A regra PQ usa somente `i`: preparação quando

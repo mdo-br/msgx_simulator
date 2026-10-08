@@ -1,4 +1,4 @@
-// Detalhamento baseado em main.pdf, seções 3.1–3.4, páginas 5–8.
+// Detalhamento baseado no artigo publicado (SBSeg 2026), seções 3.1–3.4, páginas 5–8.
 // Fórmulas do transporte/camadas complementadas pelos diagramas v4.
 const op = (title, actor, input, formula, output, source) => ({title, actor, input, formula, output, source});
 const OPERATIONS = [
