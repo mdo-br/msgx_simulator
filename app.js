@@ -72,19 +72,19 @@ function scrollToCurrentOperation(startOfStep = false) {
     timeline.scrollTop = Math.max(0, timeline.scrollTop + target.top - top);
   }
 }
-async function stage(value, run) {
+async function stage(value, run, {from = 0, to = OPERATIONS[value].length} = {}) {
   if (run !== epoch) throw CANCELLED;
   step = value;
-  for (let n = 0; n < OPERATIONS[value].length; n++) {
+  for (let n = from; n < to; n++) {
     if (value === 1 && n === 1) bobPrekeysClaimed = true;
     if (value === 2 && OPERATIONS[value][n].title === 'Gerar efêmeras de sessão') aliceSessionEphemeral = 'available';
     activeOperation = n; render();
-    scrollToCurrentOperation(n === 0);
+    scrollToCurrentOperation(n === from);
     await delay(run);
   }
-  if (value === 2) { aliceDerived = true; aliceSessionEphemeral = 'discarded'; }
-  if (value === 3) groupCreated = true;
-  if (value === 5) bobPrekeysDeleted = true;
+  if (value === 2 && to === OPERATIONS[value].length) { aliceDerived = true; aliceSessionEphemeral = 'discarded'; }
+  if (value === 3 && to === OPERATIONS[value].length) groupCreated = true;
+  if (value === 5 && to === OPERATIONS[value].length) bobPrekeysDeleted = true;
 }
 function render() {
   $('counter').textContent = step < 0 ? registered ? 'Aguardando uma mensagem' : busy ? 'Registro em execução' : 'Aguardando registro de Alice' : `Passo ${step + 1} · ${step} de 8${busy ? ' · em execução' : ''}`;
@@ -279,7 +279,7 @@ $('send-form').onsubmit = async e => {
       for (let i=1;i<=5;i++) await stage(i,run);
       established = true;
     }
-    await stage(6,run);
+    await stage(6, run, {to: bobOnline ? 4 : 3});
     alice.msgGX.index++; published++; record.session = alice.msgGX.session; record.index = alice.msgGX.index; record.transported = true;
     $('payload').textContent = text;
     $('event').textContent = `evt_${alice.msgGX.session},${alice.msgGX.index} = AEAD(Σ.msgGX.M_${alice.msgGX.session},${alice.msgGX.index},\n  AEAD(Γ.msgGX.M_${alice.msgGX.session},${alice.msgGX.index}, msg))\n\nPublicações de Alice: 1 · destinatários: ${Number($('members').value)-1}`;
@@ -306,7 +306,8 @@ $('bob-power').onclick = async () => {
     const count = deliveryQueue.length;
     while(deliveryQueue.length) {
       const event = deliveryQueue[0];
-      await stage(event.type === 'setup' ? 8 : 6,run);
+      if (event.type === 'setup') await stage(8, run);
+      else await stage(6, run, {from: 3, to: 4});
       receive(event); deliveryQueue.shift(); render();
     }
     log(`Bob reconectou · ${count} envelope(s) processado(s) em ordem.`,null);

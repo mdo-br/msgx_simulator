@@ -168,3 +168,8 @@ A operação 8.5 mostra o envelope genérico com T e campos PQ opcionais de
 ambos os ramos, separado do envelope efetivo de avanço somente de cadeia.
 `setup_s` usa o número da sessão msgGX; `i` continua sendo a etapa de raiz.
 As tuplas são notação didática, não uma serialização de wire especificada.
+
+Com Bob offline, o envio anima somente as operações 7.1–7.3, até o transporte
+para o HS_B. Ao reconectar, cada evento pendente anima apenas a entrega e
+abertura (7.4), sem repetir o avanço, a cifra ou a publicação de Alice.
+Os setups pendentes continuam usando as operações de recebimento do passo ⑨.
