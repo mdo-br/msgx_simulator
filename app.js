@@ -31,6 +31,7 @@ let activeOperation = -1, aliceDerived = false, groupCreated = false;
 let inspection = null;
 let aliceSessionEphemeral = 'absent';
 let bobPrekeysClaimed = false, bobPrekeysDeleted = false;
+let preKeyStatus = 'none';
 const CANCELLED = Symbol('cancelled');
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function reset() {
@@ -40,7 +41,7 @@ function reset() {
   bobOnline = true; conversation = []; deliveryQueue = [];
   chatOpen = established = busy = false;
   registered = bundlesGenerated = false; registration = 'idle'; aliceSessionEphemeral = 'absent';
-  bobPrekeysClaimed = bobPrekeysDeleted = false;
+  bobPrekeysClaimed = bobPrekeysDeleted = false; preKeyStatus = 'none';
   activeOperation = -1; aliceDerived = groupCreated = false; inspection = null;
   $('message').value = ''; $('messages').replaceChildren();
   $('payload').textContent = 'Mensagem'; $('event').textContent = 'Nenhum evento publicado.';
@@ -78,17 +79,18 @@ async function stage(value, run, {from = 0, to = OPERATIONS[value].length} = {})
   for (let n = from; n < to; n++) {
     if (value === 1 && n === 1) bobPrekeysClaimed = true;
     if (value === 2 && OPERATIONS[value][n].title === 'Gerar efêmeras de sessão') aliceSessionEphemeral = 'available';
+    if (value === 4) preKeyStatus = n === 0 ? 'assembling' : 'in-transit';
     activeOperation = n; render();
     scrollToCurrentOperation(n === from);
     await delay(run);
   }
   if (value === 2 && to === OPERATIONS[value].length) { aliceDerived = true; aliceSessionEphemeral = 'discarded'; }
   if (value === 3 && to === OPERATIONS[value].length) groupCreated = true;
-  if (value === 5 && to === OPERATIONS[value].length) bobPrekeysDeleted = true;
+  if (value === 5 && to === OPERATIONS[value].length) { bobPrekeysDeleted = true; preKeyStatus = 'delivered'; }
 }
 function render() {
-  $('counter').textContent = step < 0 ? registered ? 'Aguardando uma mensagem' : busy ? 'Registro em execução' : 'Aguardando registro de Alice' : `Passo ${step + 1} · ${step} de 8${busy ? ' · em execução' : ''}`;
-  const phase = step < 0 ? 0 : FLOW[step].phase;
+  $('counter').textContent = step < 0 ? registered ? 'Aguardando uma mensagem' : busy ? 'Registro em execução' : 'Aguardando registro de Alice' : `Passo ${'①②③④⑤⑥⑦⑧⑨'[step]} · ${step} de 8${busy ? ' · em execução' : ''}`;
+  const phase = step < 0 ? 1 : FLOW[step].phase;
   $('phases').innerHTML = PHASES.map((p,i) => `<span class="phase-tab ${phase === i+1 ? 'active' : ''}">0${i+1} · ${p}</span>`).join('');
   renderTimeline();
   renderExplanation();
@@ -162,7 +164,7 @@ function renderExplanation() {
 function renderKeys() {
   const owner = $('owner').value;
   if (owner === 'Servidores') {
-    $('keys').innerHTML = `<p class="muted">HS_B: ${bobPrekeysClaimed ? 'EK_B e PQE_B de Γ/Σ consumidas pelo claim; indisponíveis para novos acordos. IK_B pública e assinaturas permanecem; a resposta já entregue pode constar do histórico.' : 'Γ.bundle_B + Σ.bundle_B disponíveis; EK_B e PQE_B de uso único neste modelo.'}<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A_bundle^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A_bundle^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${step >= 4 ? 'PreKeyMessage: IK_A públicas, EK públicas de sessão (distintas do bundle de Alice), Γ.ct, Σ.ct, ids das pré-chaves de Bob, setup*\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
+    $('keys').innerHTML = `<p class="muted">HS_B: ${bobPrekeysClaimed ? 'EK_B e PQE_B de Γ/Σ consumidas pelo claim; indisponíveis para novos acordos. IK_B pública e assinaturas permanecem; a resposta já entregue pode constar do histórico.' : 'Γ.bundle_B + Σ.bundle_B disponíveis; EK_B e PQE_B de uso único neste modelo.'}<br>HS_A: ${registered ? 'Γ.bundle_A + Σ.bundle_A públicos registrados' : 'nenhum bundle de Alice registrado'}; ${step >= 1 ? 'resposta pública de Bob encaminhada' : 'nenhuma consulta a Bob'}.</p><pre>${registered ? 'Γ.bundle_A = ⟨Γ.IK_A^pub, Γ.EK_A_bundle^pub, Γ.PQE_A^pub, Γ.Sig_A⟩\nΣ.bundle_A = ⟨Σ.IK_A^pub, Σ.EK_A_bundle^pub, Σ.PQE_A^pub, Σ.Sig_A⟩\n\n' : ''}${preKeyStatus === 'delivered' ? 'PreKeyMessage inicial: entregue a Bob (histórico; não está em trânsito).\n' : preKeyStatus === 'in-transit' ? 'PreKeyMessage em trânsito: IK_A públicas, EK públicas de sessão, Γ.ct, Σ.ct, ids das pré-chaves de Bob, setup*\n' : preKeyStatus === 'assembling' ? 'PreKeyMessage: montagem local em Alice; ainda não enviada.\n' : ''}${published ? `Eventos de grupo protegidos: ${published}\n` : ''}${setups ? `Setups protegidos distribuídos: ${setups}\n` : ''}Sem chaves privadas, root keys ou mensagem em claro.</pre>`;
     return;
   }
   const initialized = owner === 'Alice' ? aliceDerived : established;
